@@ -1,0 +1,36 @@
+### Macro name for external interface
+ext_if = "em0"
+netbios_tcp = "{ 22, 23, 25, 80, 110, 111, 123, 512, 513, 514, 515, 6000, 6010 }"
+netbios_udp = "{ 123, 512, 513, 514, 515, 5353, 6000, 6010 }"
+
+### Reassemble fragmented packets
+scrub in on $ext_if all fragment reassemble
+
+### Default deny everything
+block log all
+
+### Pass loopback
+set skip on lo0
+
+### Block spooks
+antispoof for lo0
+antispoof for $ext_if inet
+block in from no-route to any
+block in from urpf-failed to any
+block in quick on $ext_if from any to 255.255.255.255
+block in quick log on $ext_if from { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 255.255.255.255/32 } to any
+
+### Block all IPv6
+block in quick inet6 all
+block out quick inet6 all
+
+### Block to and from port 0
+block quick proto { tcp, udp } from any port = 0 to any
+block quick proto { tcp, udp } from any to any port = 0
+
+### Block specific ports
+block in quick log on $ext_if proto tcp from any to any port $netbios_tcp
+block in quick log on $ext_if proto udp from any to any port $netbios_udp
+
+### Keep and modulate state of outbound tcp, udp and icmp traffic
+pass out on $ext_if proto { tcp, udp, icmp } from any to any modulate state
